@@ -1,0 +1,76 @@
+{
+  "TNA-KIX-2026-09-25": [
+    {
+      "date": "2026-05-11",
+      "time": "14:21",
+      "cheapest": 1800,
+      "flights_count": 5,
+      "prices": {
+        "9C2984": {
+          "min_price": 1800,
+          "airline": "春秋航空",
+          "is_direct": false
+        },
+        "HO7304": {
+          "min_price": 1835,
+          "airline": "吉祥航空",
+          "is_direct": false
+        },
+        "SC6843": {
+          "min_price": 1839,
+          "airline": "山东航空",
+          "is_direct": true
+        },
+        "MU6947": {
+          "min_price": 1851,
+          "airline": "东方航空",
+          "is_direct": false
+        },
+        "CA9155": {
+          "min_price": 2022,
+          "airline": "中国国航",
+          "is_direct": true
+        }
+      }
+    },
+    {
+      "date": "2026-05-11",
+      "time": "14:50",
+      "cheapest": 1800,
+      "flights_count": 5,
+      "prices": {
+        "9C2984": {
+          "min_price": 1800,
+          "airline": "春秋航空",
+          "is_direct": false
+        },
+        "HO7304": {
+          "min_price": 1835,
+          "airline": "吉祥航空",
+          "is_direct": false
+        },
+        "SC6843": {
+          "min_price": 1839,
+          "airline": "山东航空",
+          "is_direct": true
+        },
+        "MU6947": {
+          "min_price": 1851,
+          "airline": "东方航空",
+          "is_direct": false
+        },
+        "CA9155": {
+          "min_price": 2022,
+          "airline": "中国国航",
+          "is_direct": true
+        }
+      }
+    },
+    {
+      "date": "2026-05-11",
+      "time": "15:40",
+      "cheapest": 1664,
+      "flights_count": 7
+    }
+  ]
+}

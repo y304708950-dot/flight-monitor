@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>✈️ 机票价格监控</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-dark: #1557b0;
+            --success: #0d904f;
+            --danger: #d93025;
+            --warning: #f9ab00;
+            --bg: #f8f9fa;
+            --card: #ffffff;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --border: #dadce0;
+            --shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.08);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,0.15);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-tap-highlight-color: transparent;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, var(--primary), #4285f4);
+            color: white;
+            padding: 16px 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+
+        /* ── Search Form ── */
+        .search-section {
+            padding: 16px;
+        }
+        .search-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        .form-group:last-child { margin-bottom: 0; }
+        .form-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .form-row {
+            display: flex;
+            gap: 8px;
+        }
+        .form-row .form-group { flex: 1; }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            color: var(--text);
+            background: #fff;
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(26,115,232,0.1);
+        }
+        input[type="date"] {
+            padding: 9px 12px;
+        }
+
+        .swap-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--bg);
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            align-self: flex-end;
+            margin-bottom: 4px;
+            transition: transform 0.3s;
+        }
+        .swap-btn:active { transform: rotate(180deg); }
+
+        .search-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: background 0.2s;
+        }
+        .search-btn:active { background: var(--primary-dark); }
+        .search-btn:disabled {
+            background: #93b5e8;
+            cursor: not-allowed;
+        }
+
+        /* ── Tab Bar ── */
+        .tabs {
+            display: flex;
+            padding: 0 16px;
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--card);
+        }
+        .tab {
+            flex: 1;
+            padding: 12px 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* ── Results ── */
+        .results-section {
+            padding: 12px 16px;
+        }
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+        .results-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .sort-btn {
+            font-size: 12px;
+            color: var(--primary);
+            background: none;
+            border: 1px solid var(--primary);
+            border-radius: 16px;
+            padding: 4px 12px;
+            cursor: pointer;
+        }
+
+        .flight-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 14px;
+            margin-bottom: 10px;
+            box-shadow: var(--shadow);
+            transition: transform 0.15s;
+            position: relative;
+            overflow: hidden;
+        }
+        .flight-card:active { transform: scale(0.98); }
+
+        .flight-card .badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: var(--danger);
+            color: white;
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 0 0 0 8px;
+            font-weight: 500;
+        }
+        .flight-card .badge.low { background: var(--success); }
+
+        .flight-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .airline-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .airline-logo {
+            width: 28px;
+            height: 28px;
+            background: var(--bg);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .airline-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .flight-no {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .price-tag {
+            text-align: right;
+        }
+        .price-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--danger);
+        }
+        .price-value.low { color: var(--success); }
+        .price-from {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .flight-route {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+        .route-point {
+            text-align: center;
+            flex: 1;
+        }
+        .route-time {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .route-city {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        .route-line {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 8px;
+        }
+        .route-duration {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .route-bar {
+            width: 100%;
+            height: 2px;
+            background: var(--border);
+            position: relative;
+        }
+        .route-bar::after {
+            content: "✈";
+            position: absolute;
+            right: -4px;
+            top: -8px;
+            font-size: 14px;
+            color: var(--primary);
+        }
+        .route-bar.has-stop::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: -3px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--warning);
+        }
+        .route-stops {
+            font-size: 11px;
+            color: var(--warning);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+        .route-stops.direct {
+            color: var(--success);
+        }
+
+        .flight-details {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--bg);
+        }
+        .detail-item {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* ── Price Compare ── */
+        .price-compare {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+        }
+        .price-compare-title {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .price-platforms {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .platform-price {
+            padding: 3px 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .platform-price .cheapest {
+            background: #e6f4ea;
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        /* ── Calendar View ── */
+        .calendar-section {
+            padding: 16px;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .calendar-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+        }
+        .calendar-nav button {
+            width: 32px;
+            height: 32px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            background: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+        }
+        .cal-weekday {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text-secondary);
+            padding: 6px 0;
+            font-weight: 500;
+        }
+        .cal-day {
+            background: var(--card);
+            border-radius: 6px;
+            padding: 6px 2px;
+            text-align: center;
+            min-height: 52px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .cal-day:active { transform: scale(0.95); }
+        .cal-day.empty { background: transparent; cursor: default; }
+        .cal-day.today { border: 2px solid var(--primary); }
+        .cal-day.selected { background: var(--primary); color: white; }
+        .cal-day.selected .cal-price { color: rgba(255,255,255,0.9); }
+        .cal-day.weekend { background: #fff8e1; }
+        .cal-day .cal-num {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .cal-day .cal-price {
+            font-size: 10px;
+            color: var(--danger);
+            font-weight: 600;
+            margin-top: 1px;
+        }
+        .cal-day .cal-price.cheap { color: var(--success); }
+        .cal-day .cal-price.expensive { color: var(--danger); }
+
+        /* ── Alerts ── */
+        .alerts-section {
+            padding: 16px;
+        }
+        .alert-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 14px;
+            margin-bottom: 10px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .alert-info .alert-route {
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .alert-info .alert-price {
+            font-size: 13px;
+            color: var(--primary);
+        }
+        .alert-info .alert-date {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .alert-delete {
+            background: none;
+            border: none;
+            color: var(--danger);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+
+        /* ── Alert Modal ── */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--card);
+            border-radius: 16px 16px 0 0;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px 16px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .modal-handle {
+            width: 36px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+
+        /* ── Loading ── */
+        .loading {
+            text-align: center;
+            padding: 40px 16px;
+            display: none;
+        }
+        .loading.show { display: block; }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 24px;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state .title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .empty-state .desc { font-size: 13px; color: var(--text-secondary); }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #323232;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 300;
+            opacity: 0;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* ── Responsive: Tablet & Desktop ── */
+        @media (min-width: 768px) {
+            .search-section, .results-section, .calendar-section, .alerts-section {
+                max-width: 640px;
+                margin: 0 auto;
+            }
+            .tabs { max-width: 640px; margin: 0 auto; border-left: 1px solid transparent; border-right: 1px solid transparent; }
+            .flight-card { padding: 16px 20px; }
+            .calendar-grid { gap: 4px; }
+            .cal-day { min-height: 64px; padding: 8px 4px; }
+        }
+
+        /* ── Dark mode ── */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --card: #2d2d2d;
+                --text: #e8eaed;
+                --text-secondary: #9aa0a6;
+                --border: #3c3c3c;
+            }
+            input, select { background: #3c3c3c; border-color: #5f6368; color: #e8eaed; }
+            .cal-day.weekend { background: #3a3520; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <h1>✈️ 机票价格监控</h1>
+    <div class="subtitle">全网比价 · 价格追踪 · 智能提醒</div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tabs">
+    <div class="tab active" data-tab="search">🔍 搜索</div>
+    <div class="tab" data-tab="calendar">📅 日历</div>
+    <div class="tab" data-tab="alerts">🔔 提醒</div>
+</div>
+
+<!-- Search Tab -->
+<div id="tab-search" class="tab-content">
+    <div class="search-section">
+        <div class="search-card">
+            <div style="display:flex;gap:8px;align-items:flex-end;">
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">出发城市</label>
+                    <input type="text" id="origin" placeholder="济南" value="济南">
+                </div>
+                <button class="swap-btn" onclick="swapCities()">⇄</button>
+                <div class="form-group" style="flex:1">
+                    <label class="form-label">到达城市</label>
+                    <input type="text" id="dest" placeholder="大阪" value="大阪">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">出发日期</label>
+                    <input type="date" id="departDate" value="2026-09-25">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">返程日期（可选）</label>
+                    <input type="date" id="returnDate" value="2026-10-04">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">搜索范围</label>
+                <select id="searchRange">
+                    <option value="exact">仅当天</option>
+                    <option value="±3">±3天</option>
+                    <option value="±7" selected>±7天</option>
+                    <option value="±15">±15天</option>
+                </select>
+            </div>
+            <button class="search-btn" onclick="searchFlights()">🔍 搜索机票</button>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">正在全网搜索中...</div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="results" style="display:none;">
+        <div class="results-header">
+            <span class="results-count" id="resultsCount"></span>
+            <button class="sort-btn" onclick="toggleSort()">💰 按价格排序</button>
+        </div>
+        <div id="flightList"></div>
+    </div>
+
+    <!-- Empty -->
+    <div class="empty-state" id="emptyState">
+        <div class="icon">✈️</div>
+        <div class="title">输入航线信息开始搜索</div>
+        <div class="desc">支持国内200+城市，全球1000+目的地</div>
+    </div>
+</div>
+
+<!-- Calendar Tab -->
+<div id="tab-calendar" class="tab-content" style="display:none;">
+    <div class="calendar-section">
+        <div class="calendar-header">
+            <button class="calendar-nav" style="border:none;background:none;" onclick="calendarPrev()">◀</button>
+            <span class="calendar-title" id="calendarTitle"></span>
+            <button class="calendar-nav" style="border:none;background:none;" onclick="calendarNext()">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+        <p style="text-align:center;font-size:12px;color:var(--text-secondary);margin-top:12px;">
+            💡 绿色 = 低价 | 红色 = 高价 | 选择出发日查看详细航班
+        </p>
+    </div>
+</div>
+
+<!-- Alerts Tab -->
+<div id="tab-alerts" class="tab-content" style="display:none;">
+    <div class="alerts-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <span style="font-size:16px;font-weight:600;">我的价格提醒</span>
+            <button onclick="showAlertModal()" style="background:var(--primary);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;">+ 新建提醒</button>
+        </div>
+        <div id="alertList"></div>
+        <div class="empty-state" id="emptyAlerts">
+            <div class="icon">🔔</div>
+            <div class="title">暂无价格提醒</div>
+            <div class="desc">设置目标价格，降价时自动通知你</div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div class="modal-overlay" id="alertModal">
+    <div class="modal">
+        <div class="modal-handle"></div>
+        <h3 style="font-size:17px;margin-bottom:16px;">设置价格提醒</h3>
+        <div class="form-group">
+            <label class="form-label">出发城市</label>
+            <input type="text" id="alertOrigin" placeholder="济南">
+        </div>
+        <div class="form-group">
+            <label class="form-label">到达城市</label>
+            <input type="text" id="alertDest" placeholder="大阪">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">出发日期</label>
+                <input type="date" id="alertDate">
+            </div>
+            <div class="form-group">
+                <label class="form-label">目标价格 ¥</label>
+                <input type="number" id="alertPrice" placeholder="2000" min="100">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="hideAlertModal()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:white;font-size:15px;cursor:pointer;">取消</button>
+            <button onclick="createAlert()" style="flex:1;padding:12px;border:none;border-radius:8px;background:var(--primary);color:white;font-size:15px;font-weight:600;cursor:pointer;">确定</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "";  // same origin
+
+// ── Tab switching ──
+document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+        document.getElementById(`tab-${tab.dataset.tab}`).style.display = "block";
+        if (tab.dataset.tab === "calendar") loadCalendar();
+        if (tab.dataset.tab === "alerts") loadAlerts();
+    });
+});
+
+// ── Swap cities ──
+function swapCities() {
+    const o = document.getElementById("origin");
+    const d = document.getElementById("dest");
+    [o.value, d.value] = [d.value, o.value];
+}
+
+// ── Search flights ──
+let allFlights = [];
+let sortAsc = true;
+
+async function searchFlights() {
+    const origin = document.getElementById("origin").value.trim();
+    const dest = document.getElementById("dest").value.trim();
+    const departDate = document.getElementById("departDate").value;
+    const returnDate = document.getElementById("returnDate").value;
+
+    if (!origin || !dest || !departDate) {
+        toast("请填写出发城市、到达城市和出发日期");
+        return;
+    }
+
+    document.getElementById("loading").classList.add("show");
+    document.getElementById("results").style.display = "none";
+    document.getElementById("emptyState").style.display = "none";
+
+    try {
+        const params = new URLSearchParams({
+            origin, dest, depart_date: departDate,
+        });
+        if (returnDate) params.append("return_date", returnDate);
+
+        const resp = await fetch(`${API}/api/search?${params}`);
+        const data = await resp.json();
+        allFlights = data.flights || [];
+        renderFlights(allFlights);
+        document.getElementById("resultsCount").textContent =
+            `找到 ${data.total_flights} 个航班 ${data.data_note === '模拟数据 - MVP展示' ? '(模拟)' : ''}`;
+        document.getElementById("results").style.display = "block";
+    } catch (e) {
+        toast("搜索失败，请重试");
+        console.error(e);
+    } finally {
+        document.getElementById("loading").classList.remove("show");
+    }
+}
+
+function renderFlights(flights) {
+    const list = document.getElementById("flightList");
+    list.innerHTML = flights.map((f, i) => {
+        const isLow = f.min_price < 1500;
+        const platforms = Object.entries(f.prices || {})
+            .sort((a, b) => a[1] - b[1])
+            .map(([name, price], j) =>
+                `<span class="platform-price ${j === 0 ? 'cheapest' : ''}">${name} ¥${price}</span>`
+            ).join('');
+
+        return `
+        <div class="flight-card" onclick="toggleDetails(${i})">
+            ${i === 0 ? '<span class="badge low">最低价</span>' : ''}
+            ${f.seats_left <= 5 ? `<span class="badge">余${f.seats_left}座</span>` : ''}
+            <div class="flight-top">
+                <div class="airline-info">
+                    <div class="airline-logo">${f.airline_code}</div>
+                    <div>
+                        <div class="airline-name">${f.airline}</div>
+                        <div class="flight-no">${f.flight_no} · ${f.aircraft}</div>
+                    </div>
+                </div>
+                <div class="price-tag">
+                    <div class="price-value ${isLow ? 'low' : ''}">¥${f.min_price}</div>
+                    <div class="price-from">来自 ${f.min_platform}</div>
+                </div>
+            </div>
+            <div class="flight-route">
+                <div class="route-point">
+                    <div class="route-time">${f.depart_time}</div>
+                    <div class="route-city">${f.origin}</div>
+                </div>
+                <div class="route-line">
+                    <div class="route-duration">${f.duration}</div>
+                    <div class="route-bar ${f.stops > 0 ? 'has-stop' : ''}"></div>
+                    <div class="route-stops ${f.is_direct ? 'direct' : ''}">
+                        ${f.is_direct ? '✓ 直飞' : `经停${f.stops}次 ${f.stop_city}`}
+                    </div>
+                </div>
+                <div class="route-point">
+                    <div class="route-time">${f.arrive_time}</div>
+                    <div class="route-city">${f.dest}</div>
+                </div>
+            </div>
+            <div class="flight-details">
+                <span class="detail-item">🧳 ${f.baggage}</span>
+                <span class="detail-item">🛩️ ${f.aircraft}</span>
+                ${f.seats_left <= 9 ? `<span class="detail-item" style="color:var(--danger)">⚠️ 仅剩${f.seats_left}座</span>` : ''}
+            </div>
+            <div class="price-compare" id="details-${i}" style="display:${i === 0 ? 'block' : 'none'}">
+                <div class="price-compare-title">各平台价格对比</div>
+                <div class="price-platforms">${platforms}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleDetails(i) {
+    const el = document.getElementById(`details-${i}`);
+    el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+function toggleSort() {
+    sortAsc = !sortAsc;
+    const sorted = [...allFlights].sort((a, b) =>
+        sortAsc ? a.min_price - b.min_price : b.min_price - a.min_price
+    );
+    renderFlights(sorted);
+}
+
+// ── Calendar ──
+let calendarMonth = new Date(2026, 8, 1); // September 2026
+
+async function loadCalendar() {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    document.getElementById("calendarTitle").textContent = `${year}年${month + 1}月`;
+
+    const origin = document.getElementById("origin").value || "济南";
+    const dest = document.getElementById("dest").value || "大阪";
+    const startDate = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+
+    try {
+        const resp = await fetch(`${API}/api/calendar?origin=${origin}&dest=${dest}&start_date=${startDate}&months=1`);
+        const data = await resp.json();
+        renderCalendar(data.days, year, month);
+    } catch (e) {
+        console.error(e);
+        // 用简单数据
+        renderCalendar([], year, month);
+    }
+}
+
+function renderCalendar(days, year, month) {
+    const grid = document.getElementById("calendarGrid");
+    const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
+    let html = weekdays.map(w => `<div class="cal-weekday">${w}</div>`).join("");
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const startPad = firstDay === 0 ? 6 : firstDay - 1;
+
+    for (let i = 0; i < startPad; i++) html += '<div class="cal-day empty"></div>';
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    const priceMap = {};
+    days.forEach(d => { priceMap[d.date] = d; });
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        const dayData = priceMap[dateStr];
+        const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+        const weekday = new Date(year, month, d).getDay();
+        const isWeekend = weekday === 0 || weekday === 6;
+
+        let priceHtml = "";
+        if (dayData && dayData.min_price) {
+            const isCheap = dayData.min_price < 1500;
+            priceHtml = `<div class="cal-price ${isCheap ? 'cheap' : 'expensive'}">¥${dayData.min_price}</div>`;
+        }
+
+        html += `<div class="cal-day ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}" onclick="selectCalDate('${dateStr}')">
+            <div class="cal-num">${d}</div>
+            ${priceHtml}
+        </div>`;
+    }
+
+    grid.innerHTML = html;
+}
+
+function calendarPrev() {
+    calendarMonth.setMonth(calendarMonth.getMonth() - 1);
+    loadCalendar();
+}
+function calendarNext() {
+    calendarMonth.setMonth(calendarMonth.getMonth() + 1);
+    loadCalendar();
+}
+function selectCalDate(date) {
+    document.getElementById("departDate").value = date;
+    // 切换到搜索tab
+    document.querySelector('[data-tab="search"]').click();
+    searchFlights();
+}
+
+// ── Alerts ──
+async function loadAlerts() {
+    try {
+        const resp = await fetch(`${API}/api/alerts`);
+        const data = await resp.json();
+        renderAlerts(data.alerts || []);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function renderAlerts(alerts) {
+    const list = document.getElementById("alertList");
+    const empty = document.getElementById("emptyAlerts");
+    if (alerts.length === 0) {
+        empty.style.display = "block";
+        list.innerHTML = "";
+        return;
+    }
+    empty.style.display = "none";
+    list.innerHTML = alerts.map(a => `
+        <div class="alert-card">
+            <div class="alert-info">
+                <div class="alert-route">${a.origin} → ${a.dest}</div>
+                <div class="alert-price">目标价: ¥${a.target_price}</div>
+                <div class="alert-date">${a.depart_date}${a.return_date ? ' ~ ' + a.return_date : ''}</div>
+            </div>
+            <button class="alert-delete" onclick="deleteAlert('${a.id}')">✕</button>
+        </div>
+    `).join('');
+}
+
+function showAlertModal() {
+    document.getElementById("alertModal").classList.add("show");
+    document.getElementById("alertOrigin").value = document.getElementById("origin").value;
+    document.getElementById("alertDest").value = document.getElementById("dest").value;
+    document.getElementById("alertDate").value = document.getElementById("departDate").value;
+}
+function hideAlertModal() {
+    document.getElementById("alertModal").classList.remove("show");
+}
+
+async function createAlert() {
+    const origin = document.getElementById("alertOrigin").value;
+    const dest = document.getElementById("alertDest").value;
+    const date = document.getElementById("alertDate").value;
+    const price = document.getElementById("alertPrice").value;
+
+    if (!origin || !dest || !date || !price) {
+        toast("请填写完整信息");
+        return;
+    }
+
+    try {
+        const params = new URLSearchParams({ origin, dest, depart_date: date, target_price: price });
+        await fetch(`${API}/api/alerts?${params}`, { method: "POST" });
+        hideAlertModal();
+        loadAlerts();
+        toast("✅ 提醒已创建");
+    } catch (e) {
+        toast("创建失败");
+    }
+}
+
+async function deleteAlert(id) {
+    try {
+        await fetch(`${API}/api/alerts/${id}`, { method: "DELETE" });
+        loadAlerts();
+        toast("已删除");
+    } catch (e) {
+        toast("删除失败");
+    }
+}
+
+// ── Toast ──
+function toast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+// ── Init ──
+loadAlerts();
+</script>
+</body>
+</html>
