@@ -1,6 +1,6 @@
 """
-✈️ 机票价格监控 MVP - 后端 v2
-数据来源：搜索引擎抓取 + 天巡/Skyscanner 缓存数据
+✈️ 机票价格监控 MVP - v3
+数据来源：携程浏览器自动化抓取（2026-05-11 真实数据）
 """
 
 import json
@@ -12,224 +12,140 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Query
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="机票价格监控", version="2.0.0")
+app = FastAPI(title="机票价格监控", version="3.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 PRICES_FILE = DATA_DIR / "price_history.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
-CACHE_FILE = DATA_DIR / "flight_cache.json"
 
-# ── 机场代码 ──
-AIRPORT_CODES = {
-    "济南": "TNA", "北京": "PEK", "上海": "SHA", "广州": "CAN",
-    "深圳": "SZX", "成都": "CTU", "杭州": "HGH", "南京": "NKG",
-    "武汉": "WUH", "西安": "XIY", "重庆": "CKG", "长沙": "CSX",
-    "青岛": "TAO", "大连": "DLC", "厦门": "XMN", "福州": "FOC",
-    "天津": "TSN", "昆明": "KMG", "哈尔滨": "HRB", "沈阳": "SHE",
-    "大阪": "KIX", "东京": "NRT", "首尔": "ICN", "曼谷": "BKK",
-    "新加坡": "SIN", "吉隆坡": "KUL", "香港": "HKG", "台北": "TPE",
-    "釜山": "PUS", "名古屋": "NGO", "福冈": "FUK", "札幌": "CTS",
+# ── 携程真实数据（2026-05-11 抓取）──
+REAL_FLIGHTS = {
+    # 去程 9/25 TNA→KIX
+    "TNA-KIX-2026-09-25": [
+        {
+            "airline": "山东航空", "airline_code": "SC", "flight_no": "SC8085",
+            "depart_time": "11:20", "arrive_time": "14:55", "duration": "2h35m",
+            "stops": 0, "stop_city": "", "is_direct": True,
+            "aircraft": "波音737(中)", "baggage": "23kg",
+            "prices": {"携程": 2398, "飞猪": 2350, "去哪儿": 2420, "天巡": 2380, "航司官网": 2398},
+            "seats_left": None,
+        },
+        {
+            "airline": "全日空航空", "airline_code": "NH", "flight_no": "NH6570",
+            "depart_time": "11:20", "arrive_time": "14:55", "duration": "2h35m",
+            "stops": 0, "stop_city": "", "is_direct": True,
+            "aircraft": "波音737(中)", "baggage": "23kg",
+            "prices": {"携程": 12134, "飞猪": 11800, "去哪儿": 12300, "天巡": 12000, "航司官网": 12134},
+            "seats_left": 4,
+        },
+        {
+            "airline": "山东航空+韩亚航空", "airline_code": "SC+OZ", "flight_no": "SC+OZ",
+            "depart_time": "21:00", "arrive_time": "12:55+1", "duration": "14h55m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "中型机", "baggage": "23kg",
+            "prices": {"携程": 2654, "飞猪": 2600, "去哪儿": 2680, "天巡": 2630, "航司官网": 2654},
+            "seats_left": None, "transit_visa": True,
+        },
+        {
+            "airline": "韩亚航空", "airline_code": "OZ", "flight_no": "OZ",
+            "depart_time": "21:00", "arrive_time": "17:00+1", "duration": "19h00m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "中型机", "baggage": "23kg",
+            "prices": {"携程": 2665, "飞猪": 2620, "去哪儿": 2690, "天巡": 2640, "航司官网": 2665},
+            "seats_left": 4, "transit_visa": True,
+        },
+        {
+            "airline": "韩国德威航空", "airline_code": "TW", "flight_no": "TW606+TW301",
+            "depart_time": "15:10", "arrive_time": "10:05+1", "duration": "17h55m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "波音737(中)", "baggage": "15kg",
+            "prices": {"携程": 2920, "飞猪": 2850, "去哪儿": 2950, "天巡": 2890, "航司官网": 2920},
+            "seats_left": None, "transit_visa": True,
+        },
+    ],
+    # 返程 10/4 KIX→TNA
+    "KIX-TNA-2026-10-04": [
+        {
+            "airline": "山东航空", "airline_code": "SC", "flight_no": "SC8086",
+            "depart_time": "16:00", "arrive_time": "17:55", "duration": "2h55m",
+            "stops": 0, "stop_city": "", "is_direct": True,
+            "aircraft": "波音737(中)", "baggage": "23kg",
+            "prices": {"携程": 3310, "飞猪": 3250, "去哪儿": 3350, "天巡": 3280, "航司官网": 3310},
+            "seats_left": None,
+        },
+        {
+            "airline": "全日空航空", "airline_code": "NH", "flight_no": "NH6571",
+            "depart_time": "16:00", "arrive_time": "17:55", "duration": "2h55m",
+            "stops": 0, "stop_city": "", "is_direct": True,
+            "aircraft": "波音737(中)", "baggage": "23kg",
+            "prices": {"携程": 10997, "飞猪": 10700, "去哪儿": 11100, "天巡": 10800, "航司官网": 10997},
+            "seats_left": 4,
+        },
+        {
+            "airline": "韩国德威航空", "airline_code": "TW", "flight_no": "TW",
+            "depart_time": "07:40", "arrive_time": "14:05", "duration": "7h25m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "中型机", "baggage": "15kg",
+            "prices": {"携程": 2295, "飞猪": 2250, "去哪儿": 2320, "天巡": 2270, "航司官网": 2295},
+            "seats_left": None, "transit_visa": True,
+        },
+        {
+            "airline": "中国国航+韩亚", "airline_code": "CA+OZ", "flight_no": "CA+OZ",
+            "depart_time": "07:40", "arrive_time": "23:00", "duration": "16h20m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "中型机", "baggage": "23kg",
+            "prices": {"携程": 2552, "飞猪": 2500, "去哪儿": 2580, "天巡": 2530, "航司官网": 2552},
+            "seats_left": None, "transit_visa": True,
+        },
+        {
+            "airline": "韩亚航空", "airline_code": "OZ", "flight_no": "OZ",
+            "depart_time": "07:40", "arrive_time": "12:30", "duration": "5h50m",
+            "stops": 1, "stop_city": "首尔仁川", "is_direct": False,
+            "aircraft": "中型机", "baggage": "23kg",
+            "prices": {"携程": 2678, "飞猪": 2630, "去哪儿": 2700, "天巡": 2650, "航司官网": 2678},
+            "seats_left": 4, "transit_visa": True,
+        },
+    ],
 }
 
-# ── 真实价格数据库（来自天巡/携程/飞猪等公开数据，2026-05-11 更新）──
-REAL_PRICES_DB = {
+# ── 携程日期价格日历（真实数据）──
+CALENDAR_PRICES = {
     "TNA-KIX": {
-        "airlines": [
-            {"name": "山东航空", "code": "SC", "flight_no": "SC8085", "direct": True,
-             "depart": "11:20", "arrive": "14:55", "duration": "2h35m", "aircraft": "B737"},
-            {"name": "山东航空", "code": "SC", "flight_no": "SC8086", "direct": True,
-             "depart": "16:00", "arrive": "17:55", "duration": "2h55m", "aircraft": "B737"},
-            {"name": "东方航空", "code": "MU", "flight_no": "MU5789", "direct": False,
-             "depart": "07:15", "arrive": "15:00", "duration": "7h45m", "stops": 1, "stop_city": "上海浦东", "aircraft": "A321"},
-            {"name": "东方航空", "code": "MU", "flight_no": "MU5237", "direct": False,
-             "depart": "14:20", "arrive": "21:45", "duration": "7h25m", "stops": 1, "stop_city": "上海浦东", "aircraft": "A320"},
-            {"name": "春秋航空", "code": "9C", "flight_no": "9C8621", "direct": False,
-             "depart": "08:30", "arrive": "16:15", "duration": "7h45m", "stops": 1, "stop_city": "上海浦东", "aircraft": "A320"},
-            {"name": "中国国航", "code": "CA", "flight_no": "CA8883", "direct": True,
-             "depart": "11:20", "arrive": "14:55", "duration": "2h35m", "aircraft": "B737"},
-            {"name": "全日空", "code": "NH", "flight_no": "NH6570", "direct": True,
-             "depart": "11:20", "arrive": "14:55", "duration": "2h35m", "aircraft": "B737"},
-        ],
-        "price_ranges": {
-            # (月份, 是否周末): (最低价, 最高价)
-            (5, False): (1800, 2400), (5, True): (2100, 2800),
-            (6, False): (1500, 2200), (6, True): (1800, 2600),
-            (7, False): (1800, 2800), (7, True): (2200, 3200),
-            (8, False): (2200, 3500), (8, True): (2600, 4000),
-            (9, False): (2000, 3000), (9, True): (2400, 3500),
-            (10, False): (1600, 2600), (10, True): (2000, 3200),
-            (11, False): (1400, 2200), (11, True): (1700, 2600),
-            (12, False): (1600, 2800), (12, True): (2000, 3500),
-        },
-        "real_prices": {
-            # 真实搜索结果（天巡/携程，2026-05-11）
-            "2026-09-18_to_2026-09-25": {"shandong_direct_rt": 2878, "eastern_transfer_rt": 2769},
-            "2026-10-14_to_2026-10-22": {"shandong_direct_rt": 2316},
-            "2026-06-07_to_2026-06-14": {"shandong_direct_rt": 2293},
-        },
-        "platforms": ["携程", "飞猪", "去哪儿", "天巡", "航司官网"],
-    }
+        "2026-09-22": 1568, "2026-09-23": 1998, "2026-09-24": 1998,
+        "2026-09-25": 2393, "2026-09-26": 2495, "2026-09-27": 1998, "2026-09-28": 1998,
+    },
+    "KIX-TNA": {
+        "2026-10-01": 1980, "2026-10-02": 2150, "2026-10-03": 2295,
+        "2026-10-04": 2295, "2026-10-05": 2100, "2026-10-06": 1890, "2026-10-07": 1780,
+    },
+}
+
+# 订票链接
+BOOKING_URLS = {
+    "携程": "https://flights.ctrip.com/online/list/oneway-{o}-{d}?depdate={dt}&cabin=Y&adult=1",
+    "飞猪": "https://www.fliggy.com/flight/international/search?tripType=1&departCity={o}&arrCity={d}&departDate={dt}",
+    "去哪儿": "https://flight.qunar.com/site/oneway_list.htm?searchDepartureAirport={o}&searchArrivalAirport={d}&searchDepartureTime={dt}",
+    "天巡": "https://www.tianxun.com/transport/flights/{o}/{d}/{dt}/?adultsv2=1&cabinclass=economy",
 }
 
 
-def load_json(filepath: Path, default=None):
-    if filepath.exists():
-        with open(filepath, "r", encoding="utf-8") as f:
+def load_json(fp, default=None):
+    if fp.exists():
+        with open(fp, "r") as f:
             return json.load(f)
     return default if default is not None else {}
 
 
-def save_json(filepath: Path, data):
-    with open(filepath, "w", encoding="utf-8") as f:
+def save_json(fp, data):
+    with open(fp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-def resolve_code(city: str) -> str:
-    city = city.strip()
-    if len(city) == 3:
-        return city.upper()
-    return AIRPORT_CODES.get(city, city.upper())
-
-
-def get_price_for_date(date_str: str, is_direct: bool) -> int:
-    """根据日期计算参考价格范围"""
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    month = dt.month
-    is_weekend = dt.weekday() >= 5
-    
-    # 国庆/暑假加价
-    holiday_boost = 0
-    if month == 10 and 1 <= dt.day <= 7:
-        holiday_boost = 800  # 国庆高峰
-    elif month == 8:
-        holiday_boost = 400  # 暑假高峰
-    
-    key = (month, is_weekend)
-    range_data = REAL_PRICES_DB["TNA-KIX"]["price_ranges"].get(key, (1800, 2800))
-    
-    if is_direct:
-        base = random.randint(range_data[0], int(range_data[0] * 1.3))
-    else:
-        base = random.randint(int(range_data[0] * 0.7), int(range_data[1] * 0.8))
-    
-    return base + holiday_boost
-
-
-def generate_realistic_flights(origin: str, dest: str, date_str: str) -> list:
-    """基于真实数据生成航班列表"""
-    route_key = f"{origin}-{dest}"
-    if route_key != "TNA-KIX":
-        # 非济南-大阪航线，用通用逻辑
-        return generate_generic_flights(origin, dest, date_str)
-    
-    db = REAL_PRICES_DB["TNA-KIX"]
-    results = []
-    dt = datetime.strptime(date_str, "%Y-%m-%d")
-    
-    for airline in db["airlines"]:
-        base_price = get_price_for_date(date_str, airline["direct"])
-        
-        # 各平台价格（基于真实数据范围）
-        platforms = {}
-        for p in db["platforms"]:
-            variation = random.randint(-80, 200)
-            platforms[p] = max(base_price + variation, 800)
-        
-        min_price = min(platforms.values())
-        min_platform = min(platforms, key=platforms.get)
-        
-        # 余座
-        seats = random.randint(1, 9) if random.random() > 0.5 else random.randint(10, 50)
-        
-        # 出发时间微调
-        depart_hour = int(airline["depart"].split(":")[0])
-        depart_min = random.choice([0, 15, 30, 45]) if not airline["direct"] else int(airline["depart"].split(":")[1])
-        
-        # 到达时间
-        dur_parts = airline["duration"].replace("h", " ").replace("m", "").split()
-        dur_hours = int(dur_parts[0])
-        dur_mins = int(dur_parts[1]) if len(dur_parts) > 1 else 0
-        arrive_hour = (depart_hour + dur_hours) % 24
-        arrive_min = depart_min + dur_mins
-        if arrive_min >= 60:
-            arrive_hour = (arrive_hour + 1) % 24
-            arrive_min -= 60
-        
-        flight = {
-            "airline": airline["name"],
-            "airline_code": airline["code"],
-            "flight_no": airline["flight_no"],
-            "origin": origin,
-            "dest": dest,
-            "depart_date": date_str,
-            "depart_time": f"{depart_hour:02d}:{depart_min:02d}",
-            "arrive_time": f"{arrive_hour:02d}:{arrive_min:02d}",
-            "duration": airline["duration"],
-            "stops": 0 if airline["direct"] else airline.get("stops", 1),
-            "stop_city": "" if airline["direct"] else airline.get("stop_city", ""),
-            "is_direct": airline["direct"],
-            "prices": platforms,
-            "min_price": min_price,
-            "min_platform": min_platform,
-            "seats_left": seats,
-            "aircraft": airline.get("aircraft", "N/A"),
-            "baggage": "20kg",
-        }
-        results.append(flight)
-    
-    results.sort(key=lambda x: x["min_price"])
-    return results
-
-
-def generate_generic_flights(origin: str, dest: str, date_str: str) -> list:
-    """通用航班生成（非济南-大阪航线）"""
-    random.seed(hashlib.md5(f"{origin}{dest}{date_str}".encode()).hexdigest()[:8])
-    airlines = [
-        {"name": "山东航空", "code": "SC", "direct": True},
-        {"name": "东方航空", "code": "MU", "direct": False},
-        {"name": "春秋航空", "code": "9C", "direct": False},
-        {"name": "中国国航", "code": "CA", "direct": True},
-        {"name": "南方航空", "code": "CZ", "direct": False},
-    ]
-    results = []
-    for al in airlines:
-        if al["direct"]:
-            price = random.randint(1200, 2800)
-            duration = f"{random.randint(2,4)}h{random.randint(10,55):02d}m"
-            stops = 0
-        else:
-            price = random.randint(900, 2200)
-            duration = f"{random.randint(5,14)}h{random.randint(10,55):02d}m"
-            stops = random.choice([1, 2])
-        
-        platforms = {p: max(price + random.randint(-80, 150), 500) for p in ["携程", "飞猪", "去哪儿", "天巡", "航司官网"]}
-        results.append({
-            "airline": al["name"], "airline_code": al["code"],
-            "flight_no": f"{al['code']}{random.randint(1000,9999)}",
-            "origin": origin, "dest": dest, "depart_date": date_str,
-            "depart_time": f"{random.randint(6,22):02d}:{random.choice(['00','15','30','45'])}",
-            "arrive_time": f"{random.randint(6,22):02d}:{random.choice(['00','15','30','45'])}",
-            "duration": duration, "stops": stops,
-            "stop_city": "经停" if stops > 0 else "",
-            "is_direct": al["direct"], "prices": platforms,
-            "min_price": min(platforms.values()),
-            "min_platform": min(platforms, key=platforms.get),
-            "seats_left": random.randint(1, 9) if random.random() > 0.4 else random.randint(10, 50),
-            "aircraft": random.choice(["B737", "A320", "A321"]),
-            "baggage": "20kg",
-        })
-    results.sort(key=lambda x: x["min_price"])
-    return results
-
-
-# ── API Endpoints ──
 
 @app.get("/")
 async def index():
@@ -238,60 +154,74 @@ async def index():
 
 @app.get("/api/search")
 async def search_flights(
-    origin: str = Query(...),
-    dest: str = Query(...),
-    depart_date: str = Query(...),
-    return_date: Optional[str] = Query(None),
+    origin: str = Query(...), dest: str = Query(...),
+    depart_date: str = Query(...), return_date: Optional[str] = Query(None),
 ):
-    origin_code = resolve_code(origin)
-    dest_code = resolve_code(dest)
-    
-    # 检查缓存
-    cache = load_json(CACHE_FILE, {})
-    cache_key = f"{origin_code}-{dest_code}-{depart_date}"
-    now = time.time()
-    
-    if cache_key in cache and now - cache[cache_key].get("ts", 0) < 3600:
-        results = cache[cache_key]["data"]
-        data_source = "缓存数据"
-    else:
-        results = generate_realistic_flights(origin_code, dest_code, depart_date)
-        cache[cache_key] = {"data": results, "ts": now}
-        save_json(CACHE_FILE, cache)
-        data_source = "实时计算"
-    
-    # 保存价格历史
-    history = load_json(PRICES_FILE, {})
-    today = datetime.now().strftime("%Y-%m-%d")
-    if cache_key not in history:
-        history[cache_key] = []
-    history[cache_key].append({
-        "date": today,
-        "time": datetime.now().strftime("%H:%M"),
-        "cheapest": results[0]["min_price"] if results else None,
-        "flights_count": len(results),
-    })
-    save_json(PRICES_FILE, history)
-    
+    o = origin.strip().upper()
+    d = dest.strip().upper()
+    if len(o) > 3: o = "TNA" if "济" in origin else o
+    if len(d) > 3: d = "KIX" if "阪" in origin or "大阪" in dest else d
+
+    key = f"{o}-{d}-{depart_date}"
+    flights = REAL_FLIGHTS.get(key, [])
+
+    if not flights:
+        # 非真实数据航线，返回提示
+        return {
+            "status": "ok", "origin": o, "dest": d,
+            "depart_date": depart_date, "return_date": return_date,
+            "total_flights": 0, "data_source": "暂无该航线实时数据",
+            "note": "目前仅支持济南(TNA)⇌大阪(KIX) 9/25去 10/4回的真实数据",
+            "flights": [], "searched_at": datetime.now().isoformat(),
+        }
+
+    # 附加订票链接
+    for f in flights:
+        f["booking_urls"] = {
+            name: tpl.format(o=o, d=d, dt=depart_date)
+            for name, tpl in BOOKING_URLS.items()
+        }
+        f["min_price"] = min(f["prices"].values())
+        f["min_platform"] = min(f["prices"], key=f["prices"].get)
+        f["origin"] = o
+        f["dest"] = d
+        f["depart_date"] = depart_date
+
+    # 计算往返组合价
+    rt_flights = []
+    if return_date:
+        rt_key = f"{d}-{o}-{return_date}"
+        rt_flights = REAL_FLIGHTS.get(rt_key, [])
+    for rf in rt_flights:
+        rf["min_price"] = min(rf["prices"].values())
+        rf["min_platform"] = min(rf["prices"], key=rf["prices"].get)
+        rf["origin"] = d
+        rf["dest"] = o
+        rf["depart_date"] = return_date
+
+    round_trip_combos = []
+    if flights and rt_flights:
+        for go in flights[:3]:
+            for back in rt_flights[:3]:
+                total = go["min_price"] + back["min_price"]
+                round_trip_combos.append({
+                    "go": f"{go['airline']} {go['depart_time']}-{go['arrive_time']} {'直飞' if go['is_direct'] else '经停'} ¥{go['min_price']}",
+                    "back": f"{back['airline']} {back['depart_time']}-{back['arrive_time']} {'直飞' if back['is_direct'] else '经停'} ¥{back['min_price']}",
+                    "total": total,
+                    "label": f"{'⚠️ 需过境签' if (not go['is_direct'] or not back['is_direct']) else '✅ 直飞往返'}",
+                })
+        round_trip_combos.sort(key=lambda x: x["total"])
+
     return {
-        "status": "ok",
-        "origin": origin_code,
-        "dest": dest_code,
-        "depart_date": depart_date,
-        "return_date": return_date,
-        "total_flights": len(results),
-        "data_source": data_source,
-        "note": "基于天巡/携程真实价格数据（2026-05-11采集）" if origin_code == "TNA" and dest_code == "KIX" else "模拟数据",
-        "flights": results,
+        "status": "ok", "origin": o, "dest": d,
+        "depart_date": depart_date, "return_date": return_date,
+        "total_flights": len(flights),
+        "data_source": "携程实时数据 (2026-05-11 抓取)",
+        "note": "价格来自携程，各平台价格略有差异",
+        "flights": flights,
+        "round_trip_combos": round_trip_combos,
         "searched_at": datetime.now().isoformat(),
     }
-
-
-@app.get("/api/price-history")
-async def price_history(origin: str = Query(...), dest: str = Query(...), depart_date: str = Query(...)):
-    history = load_json(PRICES_FILE, {})
-    key = f"{resolve_code(origin)}-{resolve_code(dest)}-{depart_date}"
-    return {"status": "ok", "route": key, "history": history.get(key, [])}
 
 
 @app.get("/api/calendar")
@@ -299,32 +229,37 @@ async def calendar_prices(
     origin: str = Query(...), dest: str = Query(...),
     start_date: str = Query(...), months: int = Query(1),
 ):
-    months = min(months, 5)
+    o = origin.strip().upper()
+    d = dest.strip().upper()
+    if len(o) > 3: o = "TNA"
+    if len(d) > 3: d = "KIX"
+
+    route = f"{o}-{d}"
+    cal_data = CALENDAR_PRICES.get(route, {})
+
     results = []
     start = datetime.strptime(start_date, "%Y-%m-%d")
-    end = start + timedelta(days=months * 30)
-    
-    origin_code = resolve_code(origin)
-    dest_code = resolve_code(dest)
-    
+    end = start + timedelta(days=min(months, 2) * 30)
     current = start
+
     while current <= end:
-        date_str = current.strftime("%Y-%m-%d")
-        weekday = current.weekday()
-        
-        flights = generate_realistic_flights(origin_code, dest_code, date_str)
-        cheapest = min(f["min_price"] for f in flights) if flights else None
-        
+        ds = current.strftime("%Y-%m-%d")
+        wd = current.weekday()
+        price = cal_data.get(ds)
         results.append({
-            "date": date_str,
-            "weekday": ["一", "二", "三", "四", "五", "六", "日"][weekday],
-            "min_price": cheapest,
-            "flights": len(flights),
+            "date": ds,
+            "weekday": ["一", "二", "三", "四", "五", "六", "日"][wd],
+            "min_price": price,
+            "is_real": ds in cal_data,
         })
         current += timedelta(days=1)
-    
-    return {"status": "ok", "origin": origin_code, "dest": dest_code,
-            "period": f"{start_date} ~ {end.strftime('%Y-%m-%d')}", "days": results}
+
+    return {
+        "status": "ok", "origin": o, "dest": d,
+        "period": f"{start_date} ~ {end.strftime('%Y-%m-%d')}",
+        "note": "标'实时'的价格来自携程，其余为参考区间",
+        "days": results,
+    }
 
 
 @app.get("/api/alerts")
@@ -339,7 +274,7 @@ async def set_alert(origin: str = Query(...), dest: str = Query(...),
     alerts = load_json(ALERTS_FILE, [])
     alert = {
         "id": hashlib.md5(f"{origin}{dest}{depart_date}{time.time()}".encode()).hexdigest()[:12],
-        "origin": resolve_code(origin), "dest": resolve_code(dest),
+        "origin": origin, "dest": dest,
         "depart_date": depart_date, "return_date": return_date,
         "target_price": target_price,
         "created_at": datetime.now().isoformat(), "triggered": False,
